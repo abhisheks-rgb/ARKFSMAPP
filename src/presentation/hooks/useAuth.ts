@@ -1,95 +1,81 @@
 /**
  * useAuth — login / logout state for the UI layer.
  * path: src/presentation/hooks/useAuth.ts
+ *
+ * No JWT decoding. No userId in UI state.
+ * AppNavigator uses isLoggedIn (boolean) only.
+ * Profile is loaded via getCurrentUser() which uses the Bearer token.
  */
 import {useState, useCallback} from 'react';
-import {AppError} from '../../domain/errors/AppError';
-
-// ── Inline repository + use-case (no separate files needed for now) ──────────
 import axios from 'axios';
-import { TokenStorage } from '../../shared/config/TokenStorage';
+import {TokenStorage} from '../../shared/config/TokenStorage';
 
 const API_BASE = 'http://3.226.123.91:4002/api/v1';
-function base64Decode(str: string): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  let output = '';
-  const input = str.replace(/-/g, '+').replace(/_/g, '/');
-  let i = 0;
-  while (i < input.length) {
-    const e1 = chars.indexOf(input[i++]);
-    const e2 = chars.indexOf(input[i++]);
-    const e3 = chars.indexOf(input[i++]);
-    const e4 = chars.indexOf(input[i++]);
-    output += String.fromCharCode((e1 << 2) | (e2 >> 4));
-    if (e3 !== 64) output += String.fromCharCode(((e2 & 15) << 4) | (e3 >> 2));
-    if (e4 !== 64) output += String.fromCharCode(((e3 & 3)  << 6) | e4);
-  }
-  return output;
+
+interface LoginApiResponse {
+  error:         boolean;
+  message:       string;
+  access_token:  string;
+  refresh_token: string;
+  username:      string | null;
+  session_id:    string | null;
+  user_id?:      string | null; // backend should add this eventually
 }
 
-function decodeJwtUserId(token: string): string {
-  try {
-    const payload = token.split('.')[1];
-    const decoded = JSON.parse(base64Decode(payload));
-    return decoded.id as string;
-  } catch {
-    throw new Error('Invalid token received');
-  }
-}
-
-async function callLogin(identifier: string, password: string) {
-  const response = await axios.post(
+async function callLogin(
+  identifier: string,
+  password: string,
+): Promise<LoginApiResponse> {
+  const response = await axios.post<LoginApiResponse>(
     `${API_BASE}/login`,
     {
       user_name:     identifier.trim(),
       user_password: password,
-      device_id:     'samsung_SM-A715F_qcom_TP1A.220624.014',
-      device_token:  'efKbOQx7TD6qcGgihiS_VO:APA91bHY7AmPPT6YuiYUYmz1Cec7MtXK-vvgkoBvbfKCpDNDufOHlmvfSe4BLwW4Da9YL33UvWBxScKeMAMlphrfU9XD8YBHFId1tahy6wRotfyIct_4KUE',
+      device_id:     'react_native_app',
+      device_token:  '',
     },
     {headers: {'Content-Type': 'application/json'}},
   );
-  return response.data as {
-    access_token: string;
-    refresh_token: string;
-    username: string | null;
-  };
+  const data = response.data;
+  if (data.error) throw new Error(data.message ?? 'Login failed');
+  return data;
 }
 
-// ─────────────────────────────────────────────────────────────
-
 interface AuthState {
-  isLoading: boolean;
-  error: string | null;
-  userId: string | null;
+  isLoading:  boolean;
+  error:      string | null;
+  isLoggedIn: boolean;
 }
 
 export function useAuth() {
   const [state, setState] = useState<AuthState>({
-    isLoading: false,
-    error: null,
-    userId: null,
+    isLoading:  false,
+    error:      null,
+    isLoggedIn: false,
   });
 
   const login = useCallback(
-    async (identifier: string, password: string): Promise<string | null> => {
+    async (identifier: string, password: string): Promise<boolean> => {
       setState(s => ({...s, isLoading: true, error: null}));
       try {
         const data = await callLogin(identifier, password);
-        const userId = decodeJwtUserId(data.access_token);
+
+        // Save tokens — we do NOT save userId here because we don't
+        // have a reliable ID yet. getCurrentUser() uses Bearer token instead.
         await TokenStorage.saveTokens({
           access_token:  data.access_token,
           refresh_token: data.refresh_token,
-          user_id:       userId,
         });
-        setState({isLoading: false, error: null, userId});
-        return userId;
+
+        setState({isLoading: false, error: null, isLoggedIn: true});
+        return true;
       } catch (err: any) {
         const message =
-          err?.response?.data?.message ||
-          err?.message ||
+          err?.response?.data?.message ??
+          err?.message                 ??
           'Login failed. Please try again.';
-        setState({isLoading: false, error: message, userId: null});
-        return null;
+        setState({isLoading: false, error: message, isLoggedIn: false});
+        return false;
       }
     },
     [],
@@ -97,7 +83,7 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     await TokenStorage.clearAll();
-    setState({isLoading: false, error: null, userId: null});
+    setState({isLoading: false, error: null, isLoggedIn: false});
   }, []);
 
   const clearError = useCallback(() => {
@@ -105,9 +91,9 @@ export function useAuth() {
   }, []);
 
   return {
-    isLoading: state.isLoading,
-    error:     state.error,
-    userId:    state.userId,
+    isLoading:  state.isLoading,
+    error:      state.error,
+    isLoggedIn: state.isLoggedIn,
     login,
     logout,
     clearError,

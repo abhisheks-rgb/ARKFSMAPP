@@ -1,6 +1,8 @@
 /**
  * DashboardScreen — post-login landing page with theme switcher.
  * path: src/presentation/screens/DashboardScreen.tsx
+ *
+ * No userId prop — profile loaded via Bearer token automatically.
  */
 import React from 'react';
 import {
@@ -15,11 +17,10 @@ import {
 } from 'react-native';
 import {useTheme} from '../theme';
 import {useUserProfile} from '../hooks/useUserProfile';
-import {User} from '../../domain/entities/User';
 import {BusinessFeature, Follower, Post, Skill} from '../../domain/entities/User';
 
+// ── No userId prop needed anymore ─────────────────────────────
 interface Props {
-  userId: string;
   onLogout: () => void;
 }
 
@@ -81,7 +82,7 @@ function SectionCard({title, children}: {title: string; children: React.ReactNod
 
 function FollowerChip({item}: {item: Follower}) {
   const {theme} = useTheme();
-  const {colors, typography, spacing, radii} = theme;
+  const {colors, typography, spacing} = theme;
   const initial = (item.full_name || item.username)[0]?.toUpperCase() ?? '?';
   return (
     <View style={[styles.followerChip, {marginRight: spacing.sm, alignItems: 'center'}]}>
@@ -162,33 +163,29 @@ function SkillTag({skill}: {skill: Skill}) {
   const {theme} = useTheme();
   const {colors, typography, spacing, radii} = theme;
   return (
-    <View style={[{backgroundColor: colors.status.infoBg, borderRadius: radii.full,
+    <View style={{backgroundColor: colors.status.infoBg, borderRadius: radii.full,
       paddingHorizontal: spacing.sm, paddingVertical: 3,
-      marginRight: 6, marginBottom: 6}]}>
+      marginRight: 6, marginBottom: 6}}>
       <Text style={[typography.labelSm, {color: colors.status.info}]}>{skill.name}</Text>
     </View>
   );
 }
 
-// ── Theme switcher — 3-way Light / System / Dark ──────────────
 function ThemeSwitcher() {
   const {theme, mode, setMode} = useTheme();
   const {colors, typography, radii} = theme;
-
   const opts = [
     {key: 'light'  as const, icon: '☀️',  label: 'Light'},
     {key: 'system' as const, icon: '📱',  label: 'System'},
     {key: 'dark'   as const, icon: '🌙',  label: 'Dark'},
   ];
-
   return (
-    <View style={[styles.switcher, {backgroundColor: colors.surfaceAlt, borderRadius: radii.full, padding: 3}]}>
+    <View style={[styles.switcher,
+      {backgroundColor: colors.surfaceAlt, borderRadius: radii.full, padding: 3}]}>
       {opts.map(o => {
         const active = mode === o.key;
         return (
-          <TouchableOpacity
-            key={o.key}
-            onPress={() => setMode(o.key)}
+          <TouchableOpacity key={o.key} onPress={() => setMode(o.key)}
             style={[styles.switcherOpt, {borderRadius: radii.full},
               active ? {backgroundColor: colors.surface} : {}]}
             activeOpacity={0.7}>
@@ -205,14 +202,15 @@ function ThemeSwitcher() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Main Dashboard
+// Main Dashboard — no userId prop, profile fetched via token
 // ─────────────────────────────────────────────────────────────
-export default function DashboardScreen({userId, onLogout}: Props) {
+export default function DashboardScreen({onLogout}: Props) {
   const {theme} = useTheme();
   const {colors, typography, spacing, radii, shadows} = theme;
-  const {user, isLoading, error, refetch} = useUserProfile(userId);
 
-  // ── Loading ──────────────────────────────────────────────
+  // No userId passed — useUserProfile calls getCurrentUser() via token
+  const {user, isLoading, error, refetch} = useUserProfile();
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.center, {backgroundColor: colors.background}]}>
@@ -225,7 +223,6 @@ export default function DashboardScreen({userId, onLogout}: Props) {
     );
   }
 
-  // ── Error ────────────────────────────────────────────────
   if (error || !user) {
     return (
       <SafeAreaView style={[styles.center, {backgroundColor: colors.background}]}>
@@ -256,12 +253,10 @@ export default function DashboardScreen({userId, onLogout}: Props) {
   return (
     <SafeAreaView style={[styles.safe, {backgroundColor: colors.background}]}>
 
-      {/* ── Top bar ── */}
       <View style={[styles.topBar, {backgroundColor: colors.surface,
         borderBottomColor: colors.border}, shadows.sm]}>
         <Text style={[typography.h3, {color: colors.text.primary}]}>Dashboard</Text>
-        <TouchableOpacity
-          onPress={onLogout}
+        <TouchableOpacity onPress={onLogout}
           style={[styles.logoutBtn,
             {backgroundColor: colors.status.errorBg, borderRadius: radii.full}]}>
           <Text style={{fontSize: 14}}>🚪</Text>
@@ -270,19 +265,16 @@ export default function DashboardScreen({userId, onLogout}: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* ── Theme switcher bar ── */}
       <View style={[styles.themeBar, {backgroundColor: colors.surface,
         borderBottomColor: colors.border,
         paddingHorizontal: spacing.md, paddingVertical: spacing.sm}]}>
-        <Text style={[typography.caption, {color: colors.text.secondary, marginRight: spacing.sm}]}>
-          Theme
-        </Text>
+        <Text style={[typography.caption,
+          {color: colors.text.secondary, marginRight: spacing.sm}]}>Theme</Text>
         <ThemeSwitcher />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* ── Hero ── */}
         <View style={[styles.hero, {backgroundColor: colors.surface,
           paddingHorizontal: spacing.lg, paddingVertical: spacing.xl,
           marginBottom: spacing.sm, borderBottomColor: colors.border}, shadows.sm]}>
@@ -298,7 +290,6 @@ export default function DashboardScreen({userId, onLogout}: Props) {
             </View>
           </View>
 
-          {/* Name + badges */}
           <View style={{marginTop: spacing.md}}>
             <View style={styles.nameRow}>
               <Text style={[typography.h2, {color: colors.text.primary}]}>
@@ -333,8 +324,7 @@ export default function DashboardScreen({userId, onLogout}: Props) {
               </Text>
             ) : null}
 
-            <Text style={[typography.caption,
-              {color: colors.text.disabled, marginTop: 4}]}>
+            <Text style={[typography.caption, {color: colors.text.disabled, marginTop: 4}]}>
               📧 {p.email_address}
             </Text>
 
@@ -345,18 +335,16 @@ export default function DashboardScreen({userId, onLogout}: Props) {
             ) : null}
           </View>
 
-          {/* Skills */}
           {p.skill?.length > 0 && (
             <View style={[styles.chipWrap, {marginTop: spacing.md}]}>
               {p.skill.map(s => <SkillTag key={s.id} skill={s} />)}
             </View>
           )}
 
-          {/* Subscription */}
           {p.subscription_plan_name && (
-            <View style={[{backgroundColor: colors.status.successBg,
+            <View style={{backgroundColor: colors.status.successBg,
               borderRadius: radii.md, paddingHorizontal: spacing.sm,
-              paddingVertical: 6, marginTop: spacing.sm, alignSelf: 'flex-start'}]}>
+              paddingVertical: 6, marginTop: spacing.sm, alignSelf: 'flex-start'}}>
               <Text style={[typography.labelSm, {color: colors.status.success}]}>
                 ⭐ {p.subscription_plan_name}
               </Text>
@@ -364,10 +352,8 @@ export default function DashboardScreen({userId, onLogout}: Props) {
           )}
         </View>
 
-        {/* ── Sections ── */}
         <View style={{paddingHorizontal: spacing.md}}>
 
-          {/* Business */}
           {user.hasBusiness && p.business_name ? (
             <SectionCard title="Business">
               <Text style={[typography.h3, {color: colors.text.primary, marginBottom: 4}]}>
@@ -394,7 +380,6 @@ export default function DashboardScreen({userId, onLogout}: Props) {
             </SectionCard>
           ) : null}
 
-          {/* Posts */}
           {p.latest_posts?.length > 0 && (
             <SectionCard title={`Posts · ${p.post_count} total`}>
               {p.latest_posts.map((post, i) => (
@@ -404,33 +389,26 @@ export default function DashboardScreen({userId, onLogout}: Props) {
             </SectionCard>
           )}
 
-          {/* Followers */}
           {p.latest_followers?.length > 0 && (
             <SectionCard title={`Followers · ${p.follower_count}`}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.chipWrap}>
-                  {p.latest_followers.map(f => (
-                    <FollowerChip key={f.id} item={f} />
-                  ))}
+                  {p.latest_followers.map(f => <FollowerChip key={f.id} item={f} />)}
                 </View>
               </ScrollView>
             </SectionCard>
           )}
 
-          {/* Following */}
           {p.latest_following?.length > 0 && (
             <SectionCard title={`Following · ${p.following_count}`}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.chipWrap}>
-                  {p.latest_following.map(f => (
-                    <FollowerChip key={f.id} item={f} />
-                  ))}
+                  {p.latest_following.map(f => <FollowerChip key={f.id} item={f} />)}
                 </View>
               </ScrollView>
             </SectionCard>
           )}
 
-          {/* Account info */}
           <SectionCard title="Account">
             {[
               ['Role',         p.role_name],
@@ -440,12 +418,9 @@ export default function DashboardScreen({userId, onLogout}: Props) {
             ].map(([label, value]) => (
               <View key={label} style={[styles.infoRow, {borderBottomColor: colors.divider}]}>
                 <Text style={[typography.label,
-                  {color: colors.text.secondary, width: 120}]}>
-                  {label}
-                </Text>
-                <Text style={[typography.body, {color: colors.text.primary, flex: 1}]}>
-                  {value}
-                </Text>
+                  {color: colors.text.secondary, width: 120}]}>{label}</Text>
+                <Text style={[typography.body,
+                  {color: colors.text.primary, flex: 1}]}>{value}</Text>
               </View>
             ))}
           </SectionCard>
@@ -458,30 +433,28 @@ export default function DashboardScreen({userId, onLogout}: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe:         {flex: 1},
-  center:       {flex: 1, alignItems: 'center', justifyContent: 'center'},
-  topBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1,
-  },
-  logoutBtn:    {flexDirection: 'row', alignItems: 'center',
-                 paddingHorizontal: 12, paddingVertical: 7},
-  themeBar:     {flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1},
-  switcher:     {flexDirection: 'row', alignItems: 'center'},
-  switcherOpt:  {flexDirection: 'row', alignItems: 'center',
-                 paddingHorizontal: 10, paddingVertical: 7},
-  hero:         {borderBottomWidth: 1},
-  heroTop:      {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  statsRow:     {flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end'},
-  statPill:     {alignItems: 'center', paddingHorizontal: 10},
-  statDiv:      {width: 1, height: 28, marginHorizontal: 2},
-  nameRow:      {flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6},
-  badge:        {paddingHorizontal: 8, paddingVertical: 3},
-  chipWrap:     {flexDirection: 'row', flexWrap: 'wrap'},
-  followerChip: {},
-  featureCard:  {alignItems: 'center', minWidth: 76, borderWidth: 1},
-  sectionCard:  {borderWidth: 1},
-  postRow:      {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  infoRow:      {flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 1},
-  btn:          {paddingVertical: 12, paddingHorizontal: 32},
+  safe:        {flex: 1},
+  center:      {flex: 1, alignItems: 'center', justifyContent: 'center'},
+  topBar:      {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1},
+  logoutBtn:   {flexDirection: 'row', alignItems: 'center',
+                paddingHorizontal: 12, paddingVertical: 7},
+  themeBar:    {flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1},
+  switcher:    {flexDirection: 'row', alignItems: 'center'},
+  switcherOpt: {flexDirection: 'row', alignItems: 'center',
+                paddingHorizontal: 10, paddingVertical: 7},
+  hero:        {borderBottomWidth: 1},
+  heroTop:     {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  statsRow:    {flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end'},
+  statPill:    {alignItems: 'center', paddingHorizontal: 10},
+  statDiv:     {width: 1, height: 28, marginHorizontal: 2},
+  nameRow:     {flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6},
+  badge:       {paddingHorizontal: 8, paddingVertical: 3},
+  chipWrap:    {flexDirection: 'row', flexWrap: 'wrap'},
+  followerChip:{},
+  featureCard: {alignItems: 'center', minWidth: 76, borderWidth: 1},
+  sectionCard: {borderWidth: 1},
+  postRow:     {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  infoRow:     {flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 1},
+  btn:         {paddingVertical: 12, paddingHorizontal: 32},
 });

@@ -2,9 +2,8 @@
  * AppNavigator — session-aware router.
  * path: src/presentation/navigation/AppNavigator.tsx
  *
- * Launch flow:
- *   checking → token found? → Dashboard
- *                           → Login
+ * No userId in state — DashboardScreen calls getCurrentUser()
+ * which uses the Bearer token to fetch the profile.
  */
 import React, {useEffect, useState} from 'react';
 import {ActivityIndicator, View} from 'react-native';
@@ -18,31 +17,20 @@ type Screen = 'checking' | 'login' | 'dashboard';
 export default function AppNavigator() {
   const {theme} = useTheme();
   const [screen, setScreen] = useState<Screen>('checking');
-  const [userId, setUserId]  = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [token, id] = await Promise.all([
-        TokenStorage.getAccessToken(),
-        TokenStorage.getUserId(),
-      ]);
-      if (token && id) {
-        setUserId(id);
-        setScreen('dashboard');
-      } else {
-        setScreen('login');
-      }
+      const token = await TokenStorage.getAccessToken();
+      setScreen(token ? 'dashboard' : 'login');
     })();
   }, []);
 
-  function handleLoginSuccess(id: string) {
-    setUserId(id);
+  function handleLoginSuccess() {
     setScreen('dashboard');
   }
 
   async function handleLogout() {
     await TokenStorage.clearAll();
-    setUserId(null);
     setScreen('login');
   }
 
@@ -59,5 +47,5 @@ export default function AppNavigator() {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
-  return <DashboardScreen userId={userId!} onLogout={handleLogout} />;
+  return <DashboardScreen onLogout={handleLogout} />;
 }
